@@ -74,7 +74,11 @@ class image_converter:
 		
     worldPoints = []
     worldPoints.append([0, 80, 0])
-    # todo
+    worldPoints.append([0, 40, 0])
+    worldPoints.append([0, 0, 0])
+    worldPoints.append([28, 80, 0])
+    worldPoints.append([28, 40, 0])
+    worldPoints.append([28, 0, 0])
 
     solvePnP(worldPoints, cameraPoints)
 
