@@ -11,6 +11,8 @@ from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 
+import numpy as np
+
 #import matplotlib
 #matplotlib.use('Agg')
 from matplotlib import pyplot as plt
@@ -32,6 +34,18 @@ class image_converter:
 			for j in range(y, y+height):
 				if img[j, i] >= 200:
 					return [i, j] # as [x,y]
+
+  def solvePnP(worldPoints, cameraPoints):
+    intrinsics = np.matrix('614.1699 0 329.9491; 0 614.9002 237.2788; 0 0 1')
+    distCoeffs = np.matrix('0.1115 -0.1089 0 0')
+
+    rvec = np.zeros((3,1), dtype=np.double)
+    tvec = np.zeros((3,1), dtype=np.double)
+
+    self.bridge.solvePnP(worldPoints, cameraPoints, intrinsics, distCoeffs, rvec, tvec)
+
+    print(rvec)
+    print(tvec)
 		
   def callback(self,data):
     try:
@@ -42,27 +56,29 @@ class image_converter:
     width = cv_image.shape[1]
     height = cv_image.shape[0]
     
-    points = []
+    cameraPoints = []
     
-    points.append(self.findPoint(260, 320, 40, 40, cv_image))
+    cameraPoints.append(self.findPoint(260, 320, 40, 40, cv_image))
     
-    points.append(self.findPoint(290, 210, 40, 40, cv_image))
+    cameraPoints.append(self.findPoint(290, 210, 40, 40, cv_image))
     
-    points.append(self.findPoint(300, 150, 40, 40, cv_image))
-    points.append(self.findPoint(420, 160, 40, 40, cv_image))
-    points.append(self.findPoint(450, 210, 40, 40, cv_image))
-    points.append(self.findPoint(490, 330, 40, 40, cv_image))
+    cameraPoints.append(self.findPoint(300, 150, 40, 40, cv_image))
+    cameraPoints.append(self.findPoint(420, 160, 40, 40, cv_image))
+    cameraPoints.append(self.findPoint(450, 210, 40, 40, cv_image))
+    cameraPoints.append(self.findPoint(490, 330, 40, 40, cv_image))
     
     
     print(width)
     print(height)
-    print(points)
+    print(cameraPoints)
 		
-    #try:
-      #self.image_pub.publish(self.bridge.cv2_to_imgmsg(thresh1, "mono8"))
-    #except CvBridgeError as e:
-      #print(e)
+    worldPoints = []
+    worldPoints.append([0, 80, 0])
+    # todo
 
+    solvePnP(worldPoints, cameraPoints)
+
+    
       
 
 def main(args):
