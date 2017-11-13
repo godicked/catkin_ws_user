@@ -35,14 +35,17 @@ class image_converter:
 				if img[j, i] >= 200:
 					return [i, j] # as [x,y]
 
-  def solvePnP(worldPoints, cameraPoints):
+  def solvePnP(self, objectPoints, cameraPoints):
     intrinsics = np.matrix('614.1699 0 329.9491; 0 614.9002 237.2788; 0 0 1')
     distCoeffs = np.matrix('0.1115 -0.1089 0 0')
 
     rvec = np.zeros((3,1), dtype=np.double)
     tvec = np.zeros((3,1), dtype=np.double)
 
-    self.bridge.solvePnP(worldPoints, cameraPoints, intrinsics, distCoeffs, rvec, tvec)
+    print(objectPoints)
+    print(cameraPoints)
+
+    cv2.solvePnP(objectPoints, cameraPoints, intrinsics, distCoeffs, rvec, tvec)
 
     print(rvec)
     print(tvec)
@@ -72,15 +75,15 @@ class image_converter:
     print(height)
     print(cameraPoints)
 		
-    worldPoints = []
-    worldPoints.append([0, 80, 0])
-    worldPoints.append([0, 40, 0])
-    worldPoints.append([0, 0, 0])
-    worldPoints.append([28, 80, 0])
-    worldPoints.append([28, 40, 0])
-    worldPoints.append([28, 0, 0])
+    objectPoints = []
+    objectPoints.append([0, 80, 0])
+    objectPoints.append([0, 40, 0])
+    objectPoints.append([0, 0, 0])
+    objectPoints.append([28, 80, 0])
+    objectPoints.append([28, 40, 0])
+    objectPoints.append([28, 0, 0])
 
-    solvePnP(worldPoints, cameraPoints)
+    self.solvePnP(np.array(objectPoints, dtype=np.float_), np.array(cameraPoints, dtype=np.float_))
 
     
       
