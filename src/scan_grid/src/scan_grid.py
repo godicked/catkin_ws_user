@@ -49,24 +49,27 @@ def updateGrid(scan_msg):
     angle = scan_msg.angle_min
     inc = scan_msg.angle_increment
 
-    (trans,rot) = listener.lookupTransform('/odom', '/base_link', rospy.Time(0))
+    #(trans,rot) = listener.lookupTransform('/odom', '/base_link', rospy.Time(0))
     #print(trans)
     #print(rot)
 
-    (r, p, y) = tf.transformations.euler_from_quaternion(rot)
+    #print(trans)
+
+    #(r, p, y) = tf.transformations.euler_from_quaternion(rot)
     
-    angle += y
+    #angle +=  math.pi
 
     for r in scan_msg.ranges:
-        x = r * math.sin(angle) + trans[1] 
-        y = r * math.cos(angle) + trans[0]
+        x = r * math.sin(angle) #+ trans[1] 
+        y = r * math.cos(angle) #+ trans[0]
         
         angle += inc
 
 
         if r > scan_msg.range_max or r < scan_msg.range_min:
             continue
-        raytraceFree(trans[1], trans[0], x , y)
+        #raytraceFree(trans[1], trans[0], x , y)
+        raytraceFree(0, 0, x , y)
         setCell(x, y, 100)
         
 
@@ -90,7 +93,7 @@ def scanCallback(scan_msg):
 
 
 # --- main ---
-rospy.init_node("scan_grid")
+rospy.init_node("scan_gridd")
 last = rospy.Time.now()
 
 # tranform listener
@@ -98,7 +101,7 @@ listener = tf.TransformListener()
 
 # init occupancy grid
 occupancy_grid = OccupancyGrid()
-occupancy_grid.header.frame_id = "map"
+occupancy_grid.header.frame_id = "laser"
 occupancy_grid.info.resolution = 0.03 # in m/cell
 
 # width x height cells

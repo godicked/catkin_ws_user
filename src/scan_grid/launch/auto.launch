@@ -5,7 +5,7 @@
 		type="scan_grid.py" output="screen">
 	</node>
 	
-    <node pkg="tf" type="static_transform_publisher" name="laser" args="0 0 0 0 0 0 1  /base_link /laser 100"/>
-    <node pkg="tf" type="static_transform_publisher" name="map" args="0 0 0 0 0 0 1  /map /odom 100"/>
+    <!-- <node pkg="tf" type="static_transform_publisher" name="laser_tf" args="0 0 0 0 0 0 1 base_link laser 100"/>
+    <node pkg="tf" type="static_transform_publisher" name="map" args="0 0 0 0 0 0 1 map odom 100"/> -->
 
 </launch>
