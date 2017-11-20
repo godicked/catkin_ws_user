@@ -43,6 +43,11 @@ def raytraceFree(ox, oy, tx, ty):
         y = oy + dy * (i / inc)
         setCell(x, y, 0)
 
+def computePoint(range, angle):
+    x = range * math.sin(angle) #+ trans[1] 
+    y = range * math.cos(angle) #+ trans[0]
+    return (x, y)
+
 def updateGrid(scan_msg):
     global occupancy_grid
 
@@ -58,14 +63,15 @@ def updateGrid(scan_msg):
     #(r, p, y) = tf.transformations.euler_from_quaternion(rot)
     
     #angle +=  math.pi
-
+    counter = 0
     for r in scan_msg.ranges:
-        x = r * math.sin(angle) #+ trans[1] 
-        y = r * math.cos(angle) #+ trans[0]
+        (x, y) = computePoint(r, angle)
         
         angle += inc
-
-
+        counter += 1
+        #print(angle)
+        # if not (angle < -3 * math.pi / 4.0 or angle > 3 * math.pi / 4.0):
+        #     continue
         if r > scan_msg.range_max or r < scan_msg.range_min:
             continue
         #raytraceFree(trans[1], trans[0], x , y)
