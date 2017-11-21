@@ -101,8 +101,8 @@ def scanCallback(scan_msg):
         print("thetaR2 : " + str(thetaR2))
         print("")
 
-        theta02L = thetaL2 - 20 * scan_msg.angle_increment
-        theta02R = thetaR2 + 20 * scan_msg.angle_increment
+        theta02L = thetaL2 + 20 * scan_msg.angle_increment
+        theta02R = thetaR2 - 20 * scan_msg.angle_increment
         print("theta02L : " + str(theta02L))
         print("theta02R : " + str(theta02R))
         print("")
@@ -113,15 +113,24 @@ def scanCallback(scan_msg):
         print("RL : " + str(RL))
         print("RR : " + str(RR))
         print("")
+        
+        left = False
+        if  not math.isinf(dl2) and dl2 > dr2:
+            left = True
+        elif math.isinf(dr2) and math.isinf(dl2):
+            print("no good value found for estimation")
+            rospy.signal_shutdown("double inf")
+        else:
+            left = True
 
-        if(abs(RL) >= 0.26):
+        if(left):
             turning_angleL = math.asin(0.26 / RL)
-            print("turning angle L : " + str(turning_angleL) + " ; " + str(math.degrees(turning_angleL)))
-        if(abs(RR) >= 0.26):
+            print("turning angle : " + str(turning_angleL) + " ; " + str(math.degrees(turning_angleL)))
+        else:
             turning_angleR = math.asin(0.26 / RR)
-            print("turning angle R : " + str(turning_angleR) + " ; " + str(math.degrees(turning_angleR)))
+            print("turning angle : " + str(turning_angleR) + " ; " + str(math.degrees(turning_angleR)))
 
-        quit()
+        rospy.signal_shutdown("success")
 
 # --- main ---
 rospy.init_node("move")
