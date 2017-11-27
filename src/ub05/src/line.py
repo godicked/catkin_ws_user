@@ -11,48 +11,43 @@ from nav_msgs.msg import Odometry
 
 
 
-def steer(desired_heading):
-    global car_yaw, lastDiff
+# def steer(desired_heading):
+#     global car_yaw, lastDiff
 
-    Kp=1.0
-    Kd=0.5
-    calibratedZero=115
+#     Kp=1.0
+#     Kd=0.5
+#     calibratedZero=115
 
-    current_heading = car_yaw
-    print "desired heading", desired_heading
+#     current_heading = car_yaw
+#     print "desired heading", desired_heading
 
-    diff = desired_heading - current_heading
+#     diff = desired_heading - current_heading
 
-    if diff > 180:
-        diff -= 360
-    if diff < -180:
-        diff += 360
+#     if diff > 180:
+#         diff -= 360
+#     if diff < -180:
+#         diff += 360
 
-    print "heading diff", diff
-    if lastDiff == float("Inf"):
-        lastDiff = diff
+#     print "heading diff", diff
+#     if lastDiff == float("Inf"):
+#         lastDiff = diff
     
-    u = Kp * diff + Kd * (diff - lastDiff) + calibratedZero
-    lastDiff = diff
+#     u = Kp * diff + Kd * (diff - lastDiff) + calibratedZero
+#     lastDiff = diff
 
-    u = max(0, u)
-    u = min(179, u)
+#     u = max(0, u)
+#     u = min(179, u)
 
-    print "u", u
+#     print "u", u
 
-    return u
+#     return u
 
 def odomCallback(odom):
-    global init, offset_x, offset_y, time, forceZero, xvalues, yvalues
+    global init, offset_x, offset_y, time, forceZero, xvalues, yvalues, lastError, lastTime
 
     position = odom.pose.pose.position
     # simulate start at (x, y) = (0, 0)
     y = position.y - offset_y
-    
-
-    # if rospy.Time.now() - time < rospy.Duration(0.05):
-    #     return
-    # time = rospy.Time.now()
 
 
     if not init:
@@ -61,34 +56,33 @@ def odomCallback(odom):
         offset_x = position.x
     
 
-    if abs(position.x - offset_x) < 2.0:
+    if abs(position.x - offset_x) < 4.0:
         pub.publish(forward)
     else:
         pub.publish(stay)
         odom_sub.unregister()
         return
 
-    diff_y = desired_y - y
-    if abs(diff_y) < 0.05:
-        pub.publish(stay)
-        odom_sub.unregister()
-        return
+
+    error = -(desired_y - y)
+    deltaTime = (rospy.Time.now() - lastTime).to_sec()
+    derivate = (error - lastError) / deltaTime
+
+    lastError = error
+    lastTime = rospy.Time.now()
+
+    Kp = 500.0
+    Kd = 350.0
+    calibratedZero = 115
+
+    u = Kp * error + Kd * derivate + calibratedZero
+    u = max(0, u)
+    u = min(179, u)
 
 
-    
-    print "y diff", diff_y
-    desired_heading = 90 - math.atan(0.3 / diff_y)
-    if abs(diff_y) < 0.05:
-        desired_heading = 0.0
-
-    desired_heading = min(desired_heading, 25)
-    desired_heading = max(desired_heading, -25)
-
-
-    u = steer(desired_heading)
     spub.publish(u)
     ypub.publish(y)
-    #print(u)
+    print(u)
     #print(y)
 
 
@@ -110,10 +104,9 @@ spub = rospy.Publisher("/manual_control/steering", Int16, queue_size=1)
 
 ypub = rospy.Publisher("/ub05/y", Float32, queue_size=100)
 
-forceZero = False
 
-lastDiff = float("Inf")
-
+lastError = 0
+lastTime = rospy.Time.now()
 
 
 # rospy.Subscriber("scan", LaserScan, scanCallback, queue_size=1)
@@ -128,3 +121,4 @@ offset_x = 0
 car_yaw = 0
 
 rospy.spin()
+
