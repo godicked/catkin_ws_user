@@ -31,62 +31,42 @@ def computePoint(range, angle):
 
 def scanCallback(scan_msg):
     global init, lastDeltaHeading, lastTime
-    points = []
 
-    angle = scan_msg.angle_min
-    inc = scan_msg.angle_increment
-
-    # if init==False:
-    #     init=True
-    #     pub.publish(forward)
-    # else: return
-
-
-    for r in scan_msg.ranges:
-        (x, y) = computePoint(r, angle)
-        
-        angle += inc
-
-        if not (angle < -3 * math.pi / 4.0 or angle > 3 * math.pi / 4.0):
-            continue
-        if r > scan_msg.range_max or r < scan_msg.range_min:
-            continue
-
-        points.append([x, y])
-    
     #Finding Theta
 
-    l=scan_msg.ranges[240] #may be inf
-    r=scan_msg.ranges[300] #may be inf
-    
-    rmin = scan_msg.ranges[0]
-    for r in scan_msg.ranges:
-        if rmin > r:
-            rmin = r
-    
-    d = rmin
+    l=scan_msg.ranges[280] #may be inf
+    r=scan_msg.ranges[250] #may be inf
 
-    asquared=pow(l,2)+math.pow(r,2) +2*l*r*math.cos(60)
+    if l==float("inf") or r==float("inf"):
+        # print "l", l
+        # print "r", r
+        return  
+
+    alpha = math.radians(30)
+    asquared=pow(l,2)+math.pow(r,2) +2*l*r*math.cos(alpha)
     a=math.sqrt(asquared)
-    phi=(math.sin(60)*r)/a
-    #d=math.sin(phi)*l
-    thetal=math.acos(d/l)
-    theta=thetal -math.radians(30)
+    phi=(math.sin(alpha)*r)/a
+    d=math.sin(phi)*l
+
+
+    thetal= math.acos(d/l)
+    theta= thetal - math.radians(80)
     s=0.2
-    cy=d+ math.sin(theta)*s
+    cy= d+ math.sin(theta)*s
     P=0.4
     L=0.5
     thetastar=math.atan((P-cy)/L)
-    if l==float("inf") or r==float("inf"):
-        return    
-    print "l",l
-    print "r",r
-    print "phi", phi
-    print "d",d
-    print "thetal",thetal
-    print "theta",theta
+
+ 
+    # print "d", d 
+    # print "l",l
+    # print "r",r
+    # print "phi", phi
+    # print "d",d
+    # print "thetal",thetal
+    print "theta", math.degrees(theta)
     print "cy", cy
-    print ("thetastar: " + str(thetastar))
+    print ("thetastar: " + str(math.degrees(thetastar)))
 
     deltaHeading = thetastar - theta
     derivate = (deltaHeading - lastDeltaHeading) / (rospy.Time.now() - lastTime).to_sec()
@@ -94,18 +74,17 @@ def scanCallback(scan_msg):
     lastTime = rospy.Time.now()
     lastDeltaHeading = deltaHeading
     
-    Kp = 1.0
-    Kd = 1.0
+    Kp = -100.0
+    Kd = -1.0
     callibZero = 115
 
     u = Kp * deltaHeading + Kd * derivate + callibZero
 
-    spub.publish(u)
+    print "u", u
 
-    # closestDistance=scan_msg.range(0)
-    # if closestDistance<1.00:
-    #     pub.publish(stay)
-    #     print("Car stopped, obstacle in the way")
+    spub.publish(u)
+    pub.publish(forward)
+
 
 def odomCallback(odom_msg):
     return None
@@ -115,7 +94,7 @@ def odomCallback(odom_msg):
 rospy.init_node("pd_controller")
 init=False
 backward = Int16(300)
-forward = Int16(-300)
+forward = Int16(-100)
 stay = Int16(0)
 time=rospy.Time.now()
 pub = rospy.Publisher("/manual_control/speed", Int16, queue_size=1)

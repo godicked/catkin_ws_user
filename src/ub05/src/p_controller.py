@@ -5,9 +5,6 @@ from std_msgs.msg import Int16
 from std_msgs.msg import Float32
 from sensor_msgs.msg import LaserScan
 
-# def scanCallback(scan_msg):
-#     print("ScanCallback")
-
 def yawCallback(yaw):
     global time,init, timer
     if init==False:
@@ -15,10 +12,6 @@ def yawCallback(yaw):
         time = rospy.Time.now()
         print "start heading:", yaw.data
 
-
-    if rospy.Time.now() - timer < rospy.Duration(0.05):
-        return
-    timer = rospy.Time.now()
 
     current_heading=yaw.data
     # print "current_heading: ", current_heading
@@ -60,7 +53,6 @@ timer = rospy.Time.now()
 pub = rospy.Publisher("/manual_control/speed", Int16, queue_size=1)
 spub = rospy.Publisher("/manual_control/steering", Int16, queue_size=1)
 
-# rospy.Subscriber("scan", LaserScan, scanCallback, queue_size=1)
 rospy.Subscriber("/model_car/yaw", Float32, yawCallback, queue_size=1)
 
 desired_heading = rospy.get_param("~heading")
