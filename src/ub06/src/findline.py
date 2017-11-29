@@ -60,7 +60,47 @@ class image_converter:
     lr.fit(A, B)
 
     # Robustly fit linear model with RANSAC algorithm
-    ransac = linear_model.RANSACRegressor(residual_threshold=20)
+    ransac = linear_model.RANSACRegressor(residual_threshold=30)
+    ransac.fit(A, B)
+    inlier_mask = ransac.inlier_mask_
+    outlier_mask = np.logical_not(inlier_mask)
+
+    # Predict data of estimated models
+    line_X = np.arange(A.min(), A.max())[:, np.newaxis]
+    line_y = lr.predict(line_X)
+    line_y_ransac = ransac.predict(line_X)
+
+    lw = 2
+    plt.scatter(A[inlier_mask], B[inlier_mask], color='yellowgreen', marker='.',
+                label='Inliers')
+    plt.plot(line_X, line_y_ransac, color='cornflowerblue', linewidth=lw,
+            label='RANSAC regressor')
+
+
+    for x in range(len(A[inlier_mask])):
+        i = A[inlier_mask][x]
+        j = B[inlier_mask][x]
+        hsvmask[i, j] = 0
+
+    xvals = []
+    yvals = []
+
+    for j in range(0, width, 1):
+        for i in range(170, height, 1):
+            if hsvmask[i,j] == 255:
+                xvals.append([i])
+                yvals.append([j])
+
+
+    A = np.array(xvals)
+    B = np.array(yvals)
+
+    # Fit line using all data
+    lr = linear_model.LinearRegression()
+    lr.fit(A, B)
+
+    # Robustly fit linear model with RANSAC algorithm
+    ransac = linear_model.RANSACRegressor(residual_threshold=30)
     ransac.fit(A, B)
     inlier_mask = ransac.inlier_mask_
     outlier_mask = np.logical_not(inlier_mask)
