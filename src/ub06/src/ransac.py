@@ -143,10 +143,13 @@ class LinearLeastSquaresModel:
 def test():
     # generate perfect input data
 
-    n_samples = 500
+    n_samples = 10
     n_inputs = 1
     n_outputs = 1
     A_exact = 20*numpy.random.random((n_samples,n_inputs) )
+
+    print "A exact", A_exact
+
     perfect_fit = 60*numpy.random.normal(size=(n_inputs,n_outputs) ) # the model
     B_exact = scipy.dot(A_exact,perfect_fit)
     assert B_exact.shape == (n_samples,n_outputs)
@@ -155,7 +158,7 @@ def test():
     A_noisy = A_exact + numpy.random.normal(size=A_exact.shape )
     B_noisy = B_exact + numpy.random.normal(size=B_exact.shape )
 
-    if 1:
+    if 0:
         # add some outliers
         n_outliers = 100
         all_idxs = numpy.arange( A_noisy.shape[0] )
@@ -170,6 +173,7 @@ def test():
     all_data = numpy.hstack( (A_noisy,B_noisy) )
     input_columns = range(n_inputs) # the first columns of the array
     output_columns = [n_inputs+i for i in range(n_outputs)] # the last columns of the array
+
     debug = False
     model = LinearLeastSquaresModel(input_columns,output_columns,debug=debug)
 
@@ -178,8 +182,12 @@ def test():
 
     # run RANSAC algorithm
     ransac_fit, ransac_data = ransac(all_data,model,
-                                     50, 1000, 7e3, 300, # misc. parameters
+                                     2, 10, 7e3, 2, # misc. parameters
                                      debug=debug,return_all=True)
+
+    print "ransac fit", ransac_fit
+    print "ransac data", ransac_data
+    print "all data", all_data
     if 1:
         import pylab
 
