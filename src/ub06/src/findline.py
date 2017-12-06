@@ -60,7 +60,7 @@ class image_converter:
     lr.fit(A, B)
 
     # Robustly fit linear model with RANSAC algorithm
-    ransac = linear_model.RANSACRegressor(residual_threshold=30)
+    ransac = linear_model.RANSACRegressor(residual_threshold=10)
     ransac.fit(A, B)
     inlier_mask = ransac.inlier_mask_
     outlier_mask = np.logical_not(inlier_mask)
@@ -100,7 +100,7 @@ class image_converter:
     lr.fit(A, B)
 
     # Robustly fit linear model with RANSAC algorithm
-    ransac = linear_model.RANSACRegressor(residual_threshold=30)
+    ransac = linear_model.RANSACRegressor(residual_threshold=10)
     ransac.fit(A, B)
     inlier_mask = ransac.inlier_mask_
     outlier_mask = np.logical_not(inlier_mask)
