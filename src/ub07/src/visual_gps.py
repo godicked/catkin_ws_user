@@ -38,11 +38,6 @@ class image_converter:
     # Blur image to remove color noise
     cv_image = cv2.GaussianBlur(cv_image, (5,5), 0)
 
-    # cv2.imshow("img", cv_image)
-    # k = cv2.waitKey(5) & 0xFF
-    # if k == 27:
-        # return
-
 
     # rgb range
     lower_rgb = np.array([[0, 110, 0], #green
@@ -87,17 +82,12 @@ class image_converter:
             lamps_seen[k] =1
 
     #centers of lamps in image
-    center_im = np.mean(
-        np.array([ lamp_image[k] for k in range(4) if lamps_seen[k] ]),
-        axis=0
-        )
+    center_im = np.mean(lamp_image, axis=0)
 
     # print 'center image', center_im
 
     #center of lamps in real world
-    center_rw = np.mean(
-        np.array([ lamp_world[k] for k in range(4) if lamps_seen[k] ]),
-        axis=0)
+    center_rw = np.mean(lamp_world, axis=0)
 
 
     # calculate rotation matrix
@@ -107,18 +97,9 @@ class image_converter:
     sum_y=0
     for k in range(4):
         if lamps_seen[k]:
+
+            #compute scaling factor between real world and image
             scaling.append( np.sqrt(  ((lamp_world[k][0]-center_rw[0])**2+( lamp_world[k][1]-center_rw[1] )**2) / float(((lamp_image[k][0]-center_im[0])**2+( lamp_image[k][1]-center_im[1] )**2)) ) )
-
-            atan_world = atan2( (lamp_world[k][1] - center_rw[1] ), (lamp_world[k][0] - center_rw[0]) )
-
-            atan_image = atan2( (lamp_image[k][1] - center_im[1]), (lamp_image[k][0] - center_im[0]) )
-
-
-            # print 'atan1', atan_1
-            # print 'atan2', atan_2
-
-            #rotation between world and image is rotation between both points
-            rotation_angle.append( atan_world - atan_image )
 
             b_x=lamp_image[k][0] - center_im[0]
             b_y=lamp_image[k][1] - center_im[1]
@@ -127,58 +108,41 @@ class image_converter:
             sum_x+=(b_x*w_y-b_y*w_x)
             sum_y+=b_x*w_x+b_y*w_y
 
-            if rotation_angle[-1] > 2*pi:
-                rotation_angle[-1] -= 2*pi
-            if rotation_angle[-1] < 0:
-                rotation_angle[-1] += 2*pi
-
     print(lamps_seen)
     scaling_mean = np.mean( scaling)
-    # rotation_angle_mean = np.mean( rotation_angle[1:], axis = 0 )
-    # print 'angle_mean 1', math.degrees(rotation_angle_mean)
     rotation_angle_mean = atan2(sum_x, sum_y)
 
-
-    # print(math.degrees(self.angle_offset))
-
-    
-
     print 'angle_mean', math.degrees(rotation_angle_mean)
-
-    # print( 'angle: ' + str(rotation_angle))
-    # print( 'scaling: ' + str(scaling_mean))
 
     R = scaling_mean * np.array([
         [cos(rotation_angle_mean), -sin(rotation_angle_mean)],
         [sin(rotation_angle_mean),  cos(rotation_angle_mean)]
         ])
 
-    # current_pos_im = [226, 317]
     pos_image = [cv_image.shape[1] / 2.0, cv_image.shape[0] / 2.0]
-    # print "pos_image", pos_image
+    
+    # transform image position to world position
     pos_world = np.dot(R, pos_image - center_im) + center_rw
-    pos_world -= self.position_offset
 
-    print 'position in world', pos_world
+    print 'position', pos_world
 
+    # Initialise offset to start at position (0,0) with rotation 0
     if not self.init:
       self.init = True
-      #TODO uncomment
-      # self.angle_offset = rotation_angle_mean
-      # self.position_offset = pos_world
+      self.angle_offset = rotation_angle_mean
+      self.position_offset = pos_world
 
-
-    # sending odometry
-      
+    
+    # sending odometry  
     odom = Odometry()
     odom.header.frame_id  = 'odom'
     odom.header.seq = data.header.seq
-    odom.pose.pose.position.x = pos_world[0]
+    odom.pose.pose.position.x = -pos_world[0]
     odom.pose.pose.position.y = pos_world[1]
 
-    # print 'angle offset: ', math.degrees(self.angle_offset)
+    #set offset to copy car odometry behavior
+    pos_world -= self.position_offset
     rotation_angle_mean -= self.angle_offset
-    # print 'rotation with offset:', math.degrees(rotation_angle_mean)
 
 
     odom.pose.pose.orientation = Quaternion( *tf.transformations.quaternion_from_euler(0, 0, rotation_angle_mean ) )
