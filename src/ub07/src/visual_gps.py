@@ -17,17 +17,14 @@ import math
 
 class image_converter:
   def __init__(self):
-    self.gps_pub = rospy.Publisher("/visual_gps/odom", Odometry, queue_size = 10)
+    self.gps_pub = rospy.Publisher("/visual_gps/odom", Odometry, queue_size = 100)
 
     self.bridge = CvBridge()
-    self.image_sub = rospy.Subscriber("/usb_cam/image_raw",Image,self.callback, queue_size=1)
-    self.yaw_sub = rospy.Subscriber("/model_car/yaw", Float32, self.yawCallback, queue_size=1)
+    self.image_sub = rospy.Subscriber("/usb_cam/image_rect_color", Image, self.callback, queue_size=1)
+    # self.image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, self.callback, queue_size=1)
     self.init = False
     self.angle_offset = 0.0
     self.position_offset = [0,0]
-
-  def yawCallback(self, yaw):
-    self.yaw = yaw.data
 
   def callback(self,data):
     try:
@@ -69,17 +66,19 @@ class image_converter:
       [4.18, 1.77], #blue lamp
       [2.29, 2.40]] #purple lamp
 
-    for k in range(4):
-        # find lamp k in cv_image
-        mask_rgb = cv2.inRange(cv_image, lower_rgb[k], upper_rgb[k])
+    for i in range(4):
+        # find lamp i in cv_image
+        mask_rgb = cv2.inRange(cv_image, lower_rgb[i], upper_rgb[i])
         indices = np.nonzero(mask_rgb)
         
         # save lamp coordinate
-        lamp_image[k] = [ np.mean(indices[1]), np.mean(indices[0]) ]
+        lamp_image[i] = [ np.mean(indices[1]), np.mean(indices[0]) ]
 
         # check if lamp is found
-        if not isnan(lamp_image[k][0]):
-            lamps_seen[k] =1
+        if not isnan(lamp_image[i][0]):
+            lamps_seen[i] =1
+
+    print(lamps_seen)
 
     #centers of lamps in image
     center_im = np.mean(lamp_image, axis=0)
@@ -95,24 +94,24 @@ class image_converter:
     rotation_angle = []
     sum_x=0
     sum_y=0
-    for k in range(4):
-        if lamps_seen[k]:
+    for i in range(4):
+        if lamps_seen[i]:
 
             #compute scaling factor between real world and image
-            scaling.append( np.sqrt(  ((lamp_world[k][0]-center_rw[0])**2+( lamp_world[k][1]-center_rw[1] )**2) / float(((lamp_image[k][0]-center_im[0])**2+( lamp_image[k][1]-center_im[1] )**2)) ) )
+            scaling.append( np.sqrt(  ((lamp_world[i][0]-center_rw[0])**2+( lamp_world[i][1]-center_rw[1] )**2) / float(((lamp_image[i][0]-center_im[0])**2+( lamp_image[i][1]-center_im[1] )**2)) ) )
 
-            b_x=lamp_image[k][0] - center_im[0]
-            b_y=lamp_image[k][1] - center_im[1]
-            w_x=lamp_world[k][0] - center_rw[0]
-            w_y=lamp_world[k][1] - center_rw[1]
-            sum_x+=(b_x*w_y-b_y*w_x)
-            sum_y+=b_x*w_x+b_y*w_y
+            i_x=lamp_image[i][0] - center_im[0]
+            i_y=lamp_image[i][1] - center_im[1]
+            w_x=lamp_world[i][0] - center_rw[0]
+            w_y=lamp_world[i][1] - center_rw[1]
+            
+            sum_x+= i_x*w_y - i_y*w_x
+            sum_y+= i_x*w_x + i_y*w_y
 
-    print(lamps_seen)
     scaling_mean = np.mean( scaling)
     rotation_angle_mean = atan2(sum_x, sum_y)
 
-    print 'angle_mean', math.degrees(rotation_angle_mean)
+    print 'yaw', math.degrees(rotation_angle_mean)
 
     R = scaling_mean * np.array([
         [cos(rotation_angle_mean), -sin(rotation_angle_mean)],
