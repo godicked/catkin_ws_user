@@ -6,17 +6,13 @@ import rospy
 import cv2
 import numpy as np
 from math import isnan, atan, cos, sin, pi, atan2
-from sklearn import linear_model
 from std_msgs.msg import String, Float32
 from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Quaternion
 from cv_bridge import CvBridge, CvBridgeError
 import tf
-
-
-xt_list = [[0]*2]*2
-sigmat_list = [[[0]*2]*2]*2 
+import math
 
 
 class image_converter:
@@ -25,7 +21,14 @@ class image_converter:
     self.gps_pub = rospy.Publisher("/visual_gps/odom", Odometry, queue_size = 10)
 
     self.bridge = CvBridge()
-    self.image_sub = rospy.Subscriber("/usb_cam/image_raw",Image,self.callback, queue_size=1)
+    self.image_sub = rospy.Subscriber("/usb_cam/image_rect_color",Image,self.callback, queue_size=1)
+    self.yaw_sub = rospy.Subscriber("/model_car/yaw", Float32, self.yawCallback, queue_size=1)
+    self.init = False
+    self.angle_offset = 0.0
+    self.position_offset = [0,0]
+
+  def yawCallback(self, yaw):
+    self.yaw = yaw.data
 
   def callback(self,data):
     try:
@@ -37,22 +40,34 @@ class image_converter:
     cv_image = cv2.GaussianBlur(cv_image, (5,5), 0)
 
     # cv2.imshow("img", cv_image)
-    k = cv2.waitKey(5) & 0xFF
-    if k == 27:
-        return
+    # k = cv2.waitKey(5) & 0xFF
+    # if k == 27:
+        # return
 
 
     # define range of lamps in RGB
-    lower_rgb = np.array([[30, 110, 50], #green
-                         [220, 40 , 40], #red
-                         [70, 40, 240], #blue
-                         [190, 100, 190]]) #purple
-    lower_rgb = np.fliplr(lower_rgb) # flip to b,g,r for cv
+    # lower_rgb = np.array([[30, 110, 50], #green
+    #                      [220, 40 , 40], #red
+    #                      [70, 40, 240], #blue
+    #                      [190, 100, 190]]) #purple
+
+    # upper_rgb = np.array([[70, 140, 70], # green
+    #                      [255, 73, 70], #red
+    #                      [90, 60, 255], #blue 
+    #                      [255, 150, 255]]) #purple
+
+    lower_rgb = np.array([[0, 110, 0], #green
+                         [140, 0 , 0], #red
+                         [20, 20, 230], #blue
+                         [120, 20, 190]]) #purple
 
     upper_rgb = np.array([[70, 140, 70], # green
                          [255, 73, 70], #red
                          [90, 60, 255], #blue 
                          [255, 150, 255]]) #purple
+                    
+    
+    lower_rgb = np.fliplr(lower_rgb) # flip to b,g,r for cv
     upper_rgb = np.fliplr(upper_rgb) # flip to b,g,r for cv
 
     lamps_seen = [0]*4
@@ -64,7 +79,7 @@ class image_converter:
         indices = np.nonzero(mask_rgb)
         
         # save lamp coordinate
-        lamp_image[k] = [ np.mean(indices[1]), np.mean(indices[0]) ]
+        lamp_image[k] = [ np.mean(indices[0]), np.mean(indices[1]) ]
 
         # check if lamp is found
         if not isnan(lamp_image[k][0]):
@@ -72,11 +87,17 @@ class image_converter:
             #image = cv2.circle(image, tuple([ int(lamp_image[k][1]) ,int( lamp_image[k][0]) ]), 6, upper_rgb[k], 2)
 
 
+    # lamp_world = [
+    #     [2.29, 1.14 ], #green lamp
+    #     [3.55, 3.03 ], #red lamp
+    #     [4.18, 1.77 ], #blue lamp
+    #     [2.29, 2.40 ]] #purple lamp
+
     lamp_world = [
-        [2.29, 1.14 ], #green lamp
-        [3.55, 3.03 ], #red lamp
-        [4.18, 1.77 ], #blue lamp
-        [2.29, 2.40 ]] #purple lamp
+        [1.14, 2.29 ], #green lamp
+        [3.03, 3.55 ], #red lamp
+        [1.77, 4.18 ], #blue lamp
+        [2.40, 2.29 ]] #purple lamp
 
     #centers of lamps in image
     center_im = np.mean(
@@ -84,11 +105,12 @@ class image_converter:
         axis=0
         )
 
+    # print 'center image', center_im
+
     #center of lamps in real world
     center_rw = np.mean(
         np.array([ lamp_world[k] for k in range(4) if lamps_seen[k] ]),
         axis=0)
-#    print('center  rw ', center_rw)
 
 
     # calculate rotation matrix
@@ -125,13 +147,19 @@ class image_converter:
 
     print(lamps_seen)
     scaling_mean = np.mean( scaling)
-    rotation_angle_mean = np.mean( rotation_angle[1:], axis = 0 )
-    print 'angle_mean 1', rotation_angle_mean
+    # rotation_angle_mean = np.mean( rotation_angle[1:], axis = 0 )
+    # print 'angle_mean 1', math.degrees(rotation_angle_mean)
     rotation_angle_mean = atan2(sum_x,sum_y)
-    print 'angle_mean 2', rotation_angle_mean
+
+
+    # print(math.degrees(self.angle_offset))
+
+    
+
+    print 'angle_mean', math.degrees(rotation_angle_mean)
 
     # print( 'angle: ' + str(rotation_angle))
-    print( 'scaling: ' + str(scaling_mean))
+    # print( 'scaling: ' + str(scaling_mean))
 
     R = scaling_mean * np.array([
         [cos(rotation_angle_mean), -sin(rotation_angle_mean)],
@@ -139,25 +167,35 @@ class image_converter:
         ])
 
     # current_pos_im = [226, 317]
-    pos_image = [1280 / 2.0, 720 / 2.0]
+    pos_image = [cv_image.shape[0] / 2.0, cv_image.shape[1] / 2.0]
+    # print "pos_image", pos_image
     pos_world = np.dot(R, pos_image - center_im) + center_rw
+    pos_world -= self.position_offset
 
     print 'position in world', pos_world
 
+    if not self.init:
+      self.init = True
+      self.angle_offset = rotation_angle_mean
+      self.position_offset = pos_world
 
     try:
       self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
     except CvBridgeError as e:
       print(e)
       
-
     odom1 = Odometry()
-    odom1.header.frame_id  = 'map'
+    odom1.header.frame_id  = 'odom'
     odom1.header.seq = data.header.seq
-    odom1.pose.pose.position.x = pos_world[0]
-    odom1.pose.pose.position.y = -pos_world[1]
+    odom1.pose.pose.position.x = -pos_world[1]
+    odom1.pose.pose.position.y = pos_world[0]
 
-    odom1.pose.pose.orientation = Quaternion( *tf.transformations.quaternion_from_euler(0, 0, pi-1.0*rotation_angle_mean ) )
+    # print 'angle offset: ', math.degrees(self.angle_offset)
+    rotation_angle_mean -= self.angle_offset
+    print 'rotation with offset:', math.degrees(rotation_angle_mean)
+
+
+    odom1.pose.pose.orientation = Quaternion( *tf.transformations.quaternion_from_euler(0, 0, rotation_angle_mean ) )
 
     if sum(lamps_seen) >= 3:
     	self.gps_pub.publish( odom1 )
