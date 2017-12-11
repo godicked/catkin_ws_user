@@ -136,7 +136,7 @@ class image_converter:
     scaling_mean = np.mean( scaling)
     # rotation_angle_mean = np.mean( rotation_angle[1:], axis = 0 )
     # print 'angle_mean 1', math.degrees(rotation_angle_mean)
-    rotation_angle_mean = atan2(sum_y, sum_x)
+    rotation_angle_mean = atan2(sum_x, sum_y)
 
 
     # print(math.degrees(self.angle_offset))
@@ -154,7 +154,7 @@ class image_converter:
         ])
 
     # current_pos_im = [226, 317]
-    pos_image = [cv_image.shape[0] / 2.0, cv_image.shape[1] / 2.0]
+    pos_image = [cv_image.shape[1] / 2.0, cv_image.shape[0] / 2.0]
     # print "pos_image", pos_image
     pos_world = np.dot(R, pos_image - center_im) + center_rw
     pos_world -= self.position_offset
