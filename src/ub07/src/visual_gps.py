@@ -120,6 +120,10 @@ class image_converter:
 
             atan_2 = atan2( (balloon_pos_im[k][1] - center_im[1]), (balloon_pos_im[k][0] - center_im[0]) )
 
+
+            print 'atan1', atan_1
+            print 'atan2', atan_2
+
             rotation_angle.append( atan_1 - atan_2 )
             b_x=balloon_pos_im[k][0] - center_im[0]
             b_y=balloon_pos_im[k][1] - center_im[1]
