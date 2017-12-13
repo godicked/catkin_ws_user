@@ -20,8 +20,8 @@ class image_converter:
     self.gps_pub = rospy.Publisher("/visual_gps/odom", Odometry, queue_size = 100)
 
     self.bridge = CvBridge()
-    self.image_sub = rospy.Subscriber("/usb_cam/image_rect_color", Image, self.callback, queue_size=1)
-    # self.image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, self.callback, queue_size=1)
+    # self.image_sub = rospy.Subscriber("/usb_cam/image_rect_color", Image, self.callback, queue_size=1)
+    self.image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, self.callback, queue_size=1)
     self.init = False
     self.angle_offset = 0.0
     self.position_offset = [0,0]
@@ -94,7 +94,7 @@ class image_converter:
     rotation_angle = []
     sum_x=0
     sum_y=0
-    for i in range(4):
+    for i in range(2):
         if lamps_seen[i]:
 
             #compute scaling factor between real world and image
