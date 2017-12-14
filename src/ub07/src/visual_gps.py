@@ -21,8 +21,8 @@ class image_converter:
     self.gps_pub = rospy.Publisher("/visual_gps/odom", Odometry, queue_size = 100)
 
     self.bridge = CvBridge()
-    # self.image_sub = rospy.Subscriber("/usb_cam/image_rect_color", Image, self.callback, queue_size=1)
-    self.image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, self.callback, queue_size=1)
+    self.image_sub = rospy.Subscriber("/usb_cam/image_rect_color", Image, self.callback, queue_size=1)
+    # self.image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, self.callback, queue_size=1)
 
     self.lamp_pub = rospy.Publisher("/lamp_marker", Marker, queue_size=1)
     self.init = False
@@ -63,9 +63,14 @@ class image_converter:
     # Blur image to remove color noise
     cv_image = cv2.GaussianBlur(cv_image, (5,5), 0)
 
+    cv_image = cv2.flip(cv_image, 1)
+    cv_image = cv2.transpose(cv_image)
+    cv_image = cv2.flip(cv_image, 1)
+    cv_image = cv2.flip(cv_image, 0)
+
 
     # rgb range
-    lower_rgb = np.array([[0, 110, 0], #green
+    lower_rgb = np.array([[0, 80, 0], #green
                          [140, 0 , 0], #red
                          [20, 20, 230], #blue
                          [120, 20, 190]]) #purple
@@ -102,14 +107,16 @@ class image_converter:
         indices = np.nonzero(mask_rgb)
         
         # save lamp coordinate
-        lamp_image[i] = [  cv_image.shape[1] - np.mean(indices[1]), np.mean(indices[0]) ]
+        lamp_image[i] = [ np.mean(indices[1]), np.mean(indices[0]) ]
 
         # check if lamp is found
         if not isnan(lamp_image[i][0]):
             lamps_seen[i] = 1
+            cv2.circle(cv_image,((int)(lamp_image[i][0]),(int)(lamp_image[i][1])), 10, upper_rgb[i], -1)
 
     print(lamps_seen)
 
+    
     #centers of lamps in image
     center_im = np.mean([lamp_image[i] for i in range(4) if lamps_seen[i]], axis=0)
 
@@ -121,24 +128,28 @@ class image_converter:
 
     # calculate rotation matrix
     scaling = []
-    rotation_angle = []
     sum_x=0
     sum_y=0
+
     for i in range(4):
         if lamps_seen[i]:
 
             #compute scaling factor between real world and image
             scaling.append( np.sqrt(((lamp_world[i][0]-center_rw[0])**2+( lamp_world[i][1]-center_rw[1] )**2) / float(((lamp_image[i][0]-center_im[0])**2+( lamp_image[i][1]-center_im[1] )**2)) ) )
 
-            print 'lamp pos', center_im
-
             i_x=lamp_image[i][0] - center_im[0]
             i_y=lamp_image[i][1] - center_im[1]
             w_x=lamp_world[i][0] - center_rw[0]
             w_y=lamp_world[i][1] - center_rw[1]
             
-            sum_x+= i_x*w_y - i_y*w_x
-            sum_y+= i_x*w_x + i_y*w_y
+            det = i_x*w_y - i_y*w_x
+            dot = i_x*w_x + i_y*w_y
+            # print 'angle', math.degrees(atan2(det, dot))
+            sum_x += det
+            sum_y += dot
+
+            # print'lamp', i, 'pos', lamp_image[i]
+            # print'lamp pos center', lamp_image[i] - center_im
 
     scaling_mean = np.mean( scaling)
     rotation_angle_mean = atan2(sum_x, sum_y)
@@ -151,7 +162,12 @@ class image_converter:
         ])
 
     # center of image
-    pos_image = [cv_image.shape[1] / 2.0, cv_image.shape[0] / 2.0]
+    pos_image = np.array([cv_image.shape[1] / 2.0, cv_image.shape[0] / 2.0])
+    cv2.circle(cv_image,((int)(pos_image[0]),(int)(pos_image[1])), 10, (255,255,255), -1)
+
+    # cv2.circle(cv_image,((int)(10),(int)(200)), 10, (255,255,255), -1)
+
+
     
     # transform image position to world position
     pos_world = np.dot(R, pos_image - center_im) + center_rw
@@ -165,12 +181,6 @@ class image_converter:
       self.position_offset = [pos_world[0], pos_world[1]]
 
 
-    #set offset to copy car odometry behavior
-    # pos_world -= self.position_offset
-    # rotation_angle_mean -= self.angle_offset
-
-    # pos_world[0] = -pos_world[0]
-
     # sending odometry  
     odom = Odometry()
     odom.header.frame_id  = 'map'
@@ -178,14 +188,17 @@ class image_converter:
     odom.pose.pose.position.x = pos_world[0]
     odom.pose.pose.position.y = pos_world[1]
 
-    odom.pose.pose.orientation = Quaternion( *tf.transformations.quaternion_from_euler(0, 0, rotation_angle_mean ) )
-
+    q = tf.transformations.quaternion_from_euler(0, 0, rotation_angle_mean )
+    odom.pose.pose.orientation = Quaternion(*q)
+    
     if sum(lamps_seen) >= 3:
     	self.gps_pub.publish( odom )
 
+
+    # Publish tranform from map to odom
     br = tf.TransformBroadcaster()
     br.sendTransform( (self.position_offset[0], self.position_offset[1], 0),
-                      tf.transformations.quaternion_from_euler(0, 0, self.angle_offset),
+                      tf.transformations.quaternion_from_euler(math.pi, 0, self.angle_offset),
                       rospy.Time.now(),
                       "odom",
                       "map")
@@ -193,6 +206,12 @@ class image_converter:
     for i in range(4):
       marker = self.buildMarker(i, lamp_world[i][0], lamp_world[i][1], rgb[i])
       self.lamp_pub.publish(marker)
+
+    # cv2.imshow('flipped', cv_image)
+
+    k = cv2.waitKey(5) & 0xFF
+    if k == 27:
+        return
 
 
 def main(args):
