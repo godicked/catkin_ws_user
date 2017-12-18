@@ -63,9 +63,15 @@ class image_converter:
     # Blur image to remove color noise
     cv_image = cv2.GaussianBlur(cv_image, (5,5), 0)
 
+    # rotate image 90 degrees clockwise.
+    cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+    # Flip around y axis
+    # The X axis in the image is now the same as the X axis on the car
     cv_image = cv2.flip(cv_image, 1)
-    cv_image = cv2.transpose(cv_image)
-    cv_image = cv2.flip(cv_image, 1)
+
+    # Flip around x axis
+    # Y axis correction because of image inversed Y indices
     cv_image = cv2.flip(cv_image, 0)
 
 
@@ -112,6 +118,7 @@ class image_converter:
         # check if lamp is found
         if not isnan(lamp_image[i][0]):
             lamps_seen[i] = 1
+            #draw detected circle on image
             cv2.circle(cv_image,((int)(lamp_image[i][0]),(int)(lamp_image[i][1])), 10, upper_rgb[i], -1)
 
     print(lamps_seen)
@@ -128,8 +135,8 @@ class image_converter:
 
     # calculate rotation matrix
     scaling = []
-    sum_x=0
-    sum_y=0
+    sum_det=0
+    sum_dot=0
 
     for i in range(4):
         if lamps_seen[i]:
@@ -145,17 +152,18 @@ class image_converter:
             det = i_x*w_y - i_y*w_x
             dot = i_x*w_x + i_y*w_y
             # print 'angle', math.degrees(atan2(det, dot))
-            sum_x += det
-            sum_y += dot
+            sum_det += det
+            sum_dot += dot
 
             # print'lamp', i, 'pos', lamp_image[i]
             # print'lamp pos center', lamp_image[i] - center_im
 
     scaling_mean = np.mean( scaling)
-    rotation_angle_mean = atan2(sum_x, sum_y)
+    rotation_angle_mean = atan2(sum_det, sum_dot)
 
     print 'yaw', math.degrees(rotation_angle_mean)
 
+    # Build rotation matrix and apply image to world scaling
     R = scaling_mean * np.array([
         [cos(rotation_angle_mean), -sin(rotation_angle_mean)],
         [sin(rotation_angle_mean),  cos(rotation_angle_mean)]
@@ -163,14 +171,13 @@ class image_converter:
 
     # center of image
     pos_image = np.array([cv_image.shape[1] / 2.0, cv_image.shape[0] / 2.0])
+    #draw robot position on image
     cv2.circle(cv_image,((int)(pos_image[0]),(int)(pos_image[1])), 10, (255,255,255), -1)
-
-    # cv2.circle(cv_image,((int)(10),(int)(200)), 10, (255,255,255), -1)
-
 
     
     # transform image position to world position
     pos_world = np.dot(R, pos_image - center_im) + center_rw
+
 
     print 'position', pos_world
 
@@ -207,8 +214,10 @@ class image_converter:
       marker = self.buildMarker(i, lamp_world[i][0], lamp_world[i][1], rgb[i])
       self.lamp_pub.publish(marker)
 
+    # Show image
     # cv2.imshow('flipped', cv_image)
 
+    # Needed for imshow
     k = cv2.waitKey(5) & 0xFF
     if k == 27:
         return
