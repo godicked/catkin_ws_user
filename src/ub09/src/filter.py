@@ -13,7 +13,21 @@ import tf
 import math
 import random
 
+
+lamp_world = [
+      [2.29, 1.14 ], #green lamp
+      [3.55, 3.03], #red lamp
+      [4.18, 1.77], #blue lamp
+      [2.29, 2.40]] #purple lamp
+
+WIDTH = 6
+HEIGHT = 5
+
+
+
 rospy.init_node('mc_filter', anonymous=True)
+
+mcpf_pub = rospy.Publisher('/mcpf/odom', Odometry, queue_size=10)
 
 def buildMarker(id, pair):
 
@@ -46,8 +60,8 @@ def buildMarker(id, pair):
 	return marker
 
 def generateParticle(minX, maxX, minY, maxY):
-	randomX = random.uniform(minX, maxX)
-	randomY = random.uniform(minY, maxY)
+	randomX = random.uniform(minX*1.0, maxX*1.0)
+	randomY = random.uniform(minY*1.0, maxY*1.0)
 	randomYaw = random.uniform(-math.pi, math.pi)
 	return [randomX, randomY, randomYaw]
 
@@ -101,14 +115,14 @@ def low_variance_resample(weighted_particles):
 		# add particle
 		x = weighted_particles[i][0][0] + random.uniform(-0.3, 0.3)
 		y = weighted_particles[i][0][1] + random.uniform(-0.3, 0.3)
-		yaw = weighted_particles[i][0][2]
+		yaw = weighted_particles[i][0][2] 
 		particles.append([x, y, yaw])
 	return particles 
 
 def weightParticles(particles, lamps, expected_angles):
 	weights = []
 	total = 0
-	deviation = 0.8
+	deviation = 0.3
 	for p in particles:
 		w = 1
 		for i in range(len(lamps)-1):
@@ -127,19 +141,50 @@ def weightParticles(particles, lamps, expected_angles):
 		pair[1] /= total
 	return weights
 
-lamp_world = [
-      [2.29, 1.14 ], #green lamp
-      [3.55, 3.03], #red lamp
-      [4.18, 1.77], #blue lamp
-      [2.29, 2.40]] #purple lamp
+def fill_cells(cells, weighted_particles):
+	for p in weighted_particles:
+		x = (int) ((p[0][0] / WIDTH*1.0)*50)
+		y = (int) ((p[0][1] / HEIGHT*1.0)*30)
+		x = min(x, 49)
+		y = min(y, 29)
+		cells[x][y].append(p) 
+	return cells
 
-particles = generateParticleSet(0, 6, 0, 5, 100)
+def findPosition(cells):
+	max = []
+	for cel in cells:
+		for c in cel:
+			if(len(c) > len(max)):
+				max = c
+	
+	vc = 0
+	vs = 0
+	sumx = 0
+	sumy = 0
+	for c in max:
+		vc += math.cos(c[0][2])
+		vs += math.sin(c[0][2])
+		sumx += c[0][0]
+		sumy += c[0][1]
+	
+	x = sumx / len(max)
+	y = sumy / len(max)
+	angle = math.atan2(vs, vc)
+
+	return (x, y, angle)
+
+	
+
+
+
+particles = generateParticleSet(0, WIDTH, 0, HEIGHT, 100)
 mc_pub = rospy.Publisher('/mcmarkerarray', MarkerArray, queue_size=10)
 last_odom = None
 
+
 count = 0
 def gpsCallback(odom):
-	global last_odom, particles, count
+	global last_odom, particles, count, cells, mcpf_pub
 
 	if last_odom != None:
 		dx = odom.pose.pose.position.x - last_odom.pose.pose.position.x
@@ -158,9 +203,9 @@ def gpsCallback(odom):
 		# update particle position
 		for p in particles:
 
-			xnoise = random.uniform(-1.0, 1.0) / 5.0
-			ynoise = random.uniform(-1.0, 1.0) / 5.0
-			yawnoise = random.uniform(-math.pi, math.pi) / 5.0
+			xnoise = random.uniform(-1.0, 1.0) / 10.0
+			ynoise = random.uniform(-1.0, 1.0) / 10.0
+			yawnoise = random.uniform(-math.pi, math.pi) / 15.0
 
 			p[0] = p[0] + dist * math.cos(p[2])  + xnoise
 			p[1] = p[1] + dist * math.sin(p[2])  + ynoise
@@ -177,8 +222,24 @@ def gpsCallback(odom):
 
 	expected_angles = compute_angles([odom.pose.pose.position.x, odom.pose.pose.position.y], lamp_world)
 	weighted_particles = weightParticles(particles, lamp_world, expected_angles)
+
+
+	cells = [[[] for y in range(30)] for x in range(50)]
+	cells = fill_cells(cells, weighted_particles)
+	(x, y, angle) = findPosition(cells)
+
+	mcpf_odom = Odometry()
+	mcpf_odom.header = odom.header
+	mcpf_odom.pose.pose.position.x = x
+	mcpf_odom.pose.pose.position.y = y
+
+	q = tf.transformations.quaternion_from_euler(0, 0, angle )
+	mcpf_odom.pose.pose.orientation = Quaternion(*q)
+
+	mcpf_pub.publish(mcpf_odom)
+
 	publishParticles(mc_pub, weighted_particles)
-	particles = low_variance_resample(weighted_particles)
+	# particles = low_variance_resample(weighted_particles)
 	last_odom = odom
 
 #def weightParticle(particle, lamps, )
