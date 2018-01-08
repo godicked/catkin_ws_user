@@ -27,7 +27,7 @@ def buildMarker(id, pair):
 	marker.ns = "particle"
 	marker.id = id
 	marker.type = Marker.ARROW
-	marker.action = Marker.ADD
+	marker.action = Marker.MODIFY
 	marker.pose.position.x = particle[0]
 	marker.pose.position.y = particle[1]
 	marker.pose.position.z = 1
@@ -76,7 +76,8 @@ def compute_angle(particle, l1, l2):
 
 	cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
 	angle = np.arccos(cosine_angle)
-
+	if angle > math.pi:
+		angle -= math.pi
 	return angle
 
 def compute_angles(particle, lamps):
@@ -89,22 +90,25 @@ def compute_angles(particle, lamps):
 def low_variance_resample(weighted_particles):
 	particles = []
 	M = len(weighted_particles)
-	r = random.uniform(0.0, 1/M)
+	r = random.uniform(0.0, 1/(M+1))
 	c = weighted_particles[0][1]
 	i = 0
 	for m in range(M):
-		u = r + (m) * (1.0/(M))
+		u = r + m * (1.0/(M+1))
 		while u > c:
 			i += 1
 			c += weighted_particles[i][1]
 		# add particle
-		particles.append(weighted_particles[i][0])
+		x = weighted_particles[i][0][0] + random.uniform(-0.3, 0.3)
+		y = weighted_particles[i][0][1] + random.uniform(-0.3, 0.3)
+		yaw = weighted_particles[i][0][2]
+		particles.append([x, y, yaw])
 	return particles 
 
 def weightParticles(particles, lamps, expected_angles):
 	weights = []
 	total = 0
-	deviation = 0.3
+	deviation = 0.8
 	for p in particles:
 		w = 1
 		for i in range(len(lamps)-1):
@@ -129,13 +133,13 @@ lamp_world = [
       [4.18, 1.77], #blue lamp
       [2.29, 2.40]] #purple lamp
 
-particles = generateParticleSet(0, 6, 0, 5, 200)
+particles = generateParticleSet(0, 6, 0, 5, 100)
 mc_pub = rospy.Publisher('/mcmarkerarray', MarkerArray, queue_size=10)
 last_odom = None
 
-
+count = 0
 def gpsCallback(odom):
-	global last_odom, particles
+	global last_odom, particles, count
 
 	if last_odom != None:
 		dx = odom.pose.pose.position.x - last_odom.pose.pose.position.x
@@ -146,9 +150,6 @@ def gpsCallback(odom):
 		(r, p, y2) = tf.transformations.euler_from_quaternion([t2.x, t2.y, t2.z, t2.w])
 		dYaw = y2 - y1
 
-		xnoise = random.uniform(-0.1, 0.1)# / 10.0
-		ynoise = random.uniform(-0.1, 0.1)# / 10.0
-		yawnoise = random.uniform(-0.5, 0.5)# / 10.0
 
 		dist = math.sqrt(dx*dx + dy*dy)
 
@@ -156,11 +157,16 @@ def gpsCallback(odom):
 
 		# update particle position
 		for p in particles:
-			p[0] = p[0] + dist * math.cos(p[2]) # + xnoise
-			p[1] = p[1] + dist * math.sin(p[2]) # + ynoise
+
+			xnoise = random.uniform(-1.0, 1.0) / 5.0
+			ynoise = random.uniform(-1.0, 1.0) / 5.0
+			yawnoise = random.uniform(-math.pi, math.pi) / 5.0
+
+			p[0] = p[0] + dist * math.cos(p[2])  + xnoise
+			p[1] = p[1] + dist * math.sin(p[2])  + ynoise
 			
 			yaw = p[2]
-			yaw += dYaw
+			yaw += dYaw + yawnoise
 			while yaw < -math.pi:
 				yaw += math.pi
 			while yaw > math.pi:
@@ -172,9 +178,7 @@ def gpsCallback(odom):
 	expected_angles = compute_angles([odom.pose.pose.position.x, odom.pose.pose.position.y], lamp_world)
 	weighted_particles = weightParticles(particles, lamp_world, expected_angles)
 	publishParticles(mc_pub, weighted_particles)
-	
-	# particles = low_variance_resample(weighted_particles)
-	
+	particles = low_variance_resample(weighted_particles)
 	last_odom = odom
 
 #def weightParticle(particle, lamps, )
