@@ -9,10 +9,11 @@ from visualization_msgs.msg import Marker
 import math
 
 
-res = 0.1 # 10cm resolution
+res = 0.08 # 10cm resolution
 width = 60
 height = 40
-max_steer = np.pi / 2
+max_steer = np.pi / 3
+offset = 0.5
 
 class Controller:
     def __init__(self, register=True):
@@ -36,19 +37,19 @@ class Controller:
         self.pub_speed.publish(Int16(speed))
         
         # Publish force field
-        # self.publish_forcefield()
+        self.publish_forcefield()
 
     
     def steer(self, pose):
         # Get position from ros message
-        x = pose.pose.position.x
-        y = pose.pose.position.y
+        wx = pose.pose.position.x
+        wy = pose.pose.position.y
         orientation_q = pose.pose.orientation
         orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
         (roll, pitch, yaw) = euler_from_quaternion (orientation_list)
 
         # Convert to matrix coordinate
-        x, y = self.world_to_matrix(x, y)
+        x, y = self.world_to_matrix(wx, wy)
 
         # Get force vector from matrix
         x1, y1 = self.matrix[x, y,:]
@@ -60,10 +61,12 @@ class Controller:
         Kp = 4.0
         steering = Kp*np.arctan(fy/(2.5*fx))
 
+        self.publish_lookahead((wx, wy), yaw + steering)
+
         # Compute speed and steering
         # When driving backward we use max steering
         if (fx>0):
-            speed = -150 # forward
+            speed = -200 # forward
         else:
             speed = 150  # backward
             if (fy>0):
@@ -79,6 +82,7 @@ class Controller:
             steering = -max_steer
 
         # print(steering)
+
         
         # car steering conversion
         steering = 90 + steering * (180/np.pi)
@@ -86,6 +90,10 @@ class Controller:
     
     def world_to_matrix(self, x, y):
         # get matrix coordinate
+
+        x -= offset
+        y -= offset
+
         x /= res
         y /= res
 
@@ -111,12 +119,21 @@ class Controller:
                 angle = math.atan2(y1, x1)
                 orientation = quaternion_from_euler(0,0, angle)
 
-                wx = x * res
-                wy = y * res
+                wx = x * res + offset
+                wy = y * res + offset
 
                 arrow = self.build_arrow((wx,wy), orientation, id)
                 self.pub_marker.publish(arrow)
                 id += 1
+
+    def publish_lookahead(self, pos, yaw):
+        x, y = pos
+        ori = quaternion_from_euler(0, 0, yaw)
+
+        arrow = self.build_arrow((x, y), ori, 9999)
+
+        self.pub_marker.publish(arrow)
+
 
 
     def build_arrow(self, pos, orientation, id):

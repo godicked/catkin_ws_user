@@ -79,11 +79,11 @@ class image_converter:
     lower_rgb = np.array([[0, 80, 0], #green
                          [140, 0 , 0], #red
                          [20, 20, 230], #blue
-                         [120, 20, 190]]) #purple
+                         [120, 60, 190]]) #purple
 
     upper_rgb = np.array([[70, 140, 70], # green
                          [255, 73, 70], #red
-                         [90, 60, 255], #blue 
+                         [40, 60, 255], #blue 
                          [255, 150, 255]]) #purple
 
     rgb = upper_rgb
