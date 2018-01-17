@@ -9,11 +9,12 @@ from visualization_msgs.msg import Marker
 import math
 
 
-res = 0.08 # 10cm resolution
+res = 0.1 # 10cm resolution
 width = 60
 height = 40
-max_steer = np.pi / 3
-offset = 0.5
+max_steer = np.pi / 2
+offsetx = 0.3
+offsety = 0.3
 
 class Controller:
     def __init__(self, register=True):
@@ -58,21 +59,20 @@ class Controller:
         # Formula from assignement
         fx = np.cos(yaw)*x1 + np.sin(yaw)*y1
         fy = -np.sin(yaw)*x1 + np.cos(yaw)*y1
-        Kp = 4.0
-        steering = Kp*np.arctan(fy/(2.5*fx))
+        Kp = 8.0
+        steering = -Kp*np.arctan(fy/(2.5*fx))
 
-        self.publish_lookahead((wx, wy), yaw + steering)
 
         # Compute speed and steering
         # When driving backward we use max steering
         if (fx>0):
-            speed = -200 # forward
+            speed = -150 # forward
         else:
             speed = 150  # backward
             if (fy>0):
-            	steering = -max_steer
-            if (fy<0):
             	steering = max_steer
+            if (fy<0):
+            	steering = -max_steer
 
         # Limit steering
         if (steering > max_steer):
@@ -83,6 +83,8 @@ class Controller:
 
         # print(steering)
 
+
+
         
         # car steering conversion
         steering = 90 + steering * (180/np.pi)
@@ -91,8 +93,8 @@ class Controller:
     def world_to_matrix(self, x, y):
         # get matrix coordinate
 
-        x -= offset
-        y -= offset
+        x -= offsetx
+        y -= offsety
 
         x /= res
         y /= res
@@ -119,8 +121,8 @@ class Controller:
                 angle = math.atan2(y1, x1)
                 orientation = quaternion_from_euler(0,0, angle)
 
-                wx = x * res + offset
-                wy = y * res + offset
+                wx = x * res + offsetx
+                wy = y * res + offsety
 
                 arrow = self.build_arrow((wx,wy), orientation, id)
                 self.pub_marker.publish(arrow)
